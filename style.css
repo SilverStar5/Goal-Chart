@@ -1,0 +1,101 @@
+body {
+    font-family: 'OpenSans', sans-serif;
+}
+
+.chart {
+    overflow-x: hidden;
+}
+
+.cp {
+    cursor: pointer;
+}
+
+.node-Block {
+    fill: #2ad8b2;
+    stroke: #ccc;
+    stroke-width: 1;
+    border-radius: 2px;
+}
+
+.node-Title {
+    /* Goal 1 */
+    position: absolute;
+    width: 53px;
+    height: 16px;
+    left: 18px;
+    top: 10px;
+    font-family: Roboto;
+    font-style: normal;
+    font-weight: bold;
+    font-size: 14px;
+    line-height: 16px;
+    display: flex;
+    align-items: center;
+    /* Gray 1 */
+    color: #333333;
+}
+
+.node-Duration {
+    /* Due Jul 10, 2021 */
+    position: absolute;
+    width: 84px;
+    height: 13px;
+    left: 18px;
+    top: 29px;
+    font-family: Roboto;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 11px;
+    line-height: 13px;
+    /* identical to box height */
+    display: flex;
+    align-items: center;
+    /* grey-7 */
+    color: #757575;
+}
+
+.node-ProNum {
+    /* 55% */
+    position: absolute;
+    width: 34px;
+    height: 21px;
+    left: 0px;
+    top: 6px;
+    font-family: Roboto;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 18px;
+    line-height: 21px;
+    /* K Blue */
+    color: #4975D4;
+}
+
+.Connector {
+    /* Connector */
+    stroke: #625d5d25;
+    stroke-width: 2px;
+    fill: none;
+    z-index: -100;
+}
+
+.tick-Title {
+    font-size: 13px;
+}
+
+.tick-Line {
+    stroke: #E0E0E0;
+    stroke-width: 1;
+    fill: white;
+}
+
+.tick-Block {
+    fill: #fff;
+    stroke: rgb(32, 32, 32);
+}
+
+.chart-Block {
+    overflow: auto;
+    fill: white;
+    stroke: rgb(0, 0, 0);
+    stroke-width: 2px;
+}
