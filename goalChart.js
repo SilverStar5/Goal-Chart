@@ -2,11 +2,6 @@ function goalChart(config) {
 
     var data = config.data;
 
-    var xaxis = d3.time.scale();
-    var yaxis = d3.scale.ordinal();
-    var xscale = d3.scale.linear();
-    var yscale = d3.scale.linear();
-
     var treeData;
     data.forEach(element => {
         if (element.parentId == null) {
@@ -15,29 +10,22 @@ function goalChart(config) {
         }
     });
 
-    // var treeData = new Array();
-    // makeTree(treeData);
-
     var ELEMENT = d3.select(config.element);
     var date_boundary = []; // x-axis boundary
     var offsetY = 0; // y-axis offset
-    var preOffsetX = 0;
     var preOffsetY = 0;
     var treeHeight = treeData.length * 120;
 
-    var scalable = false;
     var time_scales = [];
     var minTickWidth = 100;
     var maxTickWidth = 400;
     var tick_Height = 60;
     var header_Gap = 20; // gap between header and chart
-    var margin = { top: 20, right: 100, bottom: 50, left: 100 };
+    var margin = { top: 20, right: 50, bottom: 20, left: 50 };
     var total_Width = ELEMENT[0][0].offsetWidth;
     var chart_Width = d3.max([total_Width, 400]) - margin.left - margin.right;
-    var total_Height = ELEMENT[0][0].offsetHeight;
-    var chart_Height = d3.max([total_Height, 400]) - margin.top - tick_Height - margin.bottom - header_Gap;
-    // var chart_Height = d3.max([((treeData.length * 120)), 300]);
-    // var total_Height = chart_Height + tick_Height + margin.bottom + margin.top;
+    var total_Height = ELEMENT[0][0].offsetHeight - 10;
+    var chart_Height = d3.max([total_Height, 400]) - margin.top - tick_Height - margin.bottom;
 
     var region = getDataBoundary(treeData);
     date_boundary[0] = moment(region[0]).startOf('month').toDate();
@@ -48,6 +36,24 @@ function goalChart(config) {
         .append("svg")
         .attr("width", total_Width)
         .attr("height", total_Height)
+
+    var xScale = d3.time.scale()
+        .domain(date_boundary)
+        .range([0, chart_Width])
+
+    var yScale = d3.scale.ordinal();
+
+    var zoom = d3.behavior.zoom()
+        .on("zoom", update)
+        .scaleExtent([0.1, 10])
+        .x(xScale);
+    // .y(yScale)
+
+    var xAxis = d3.svg.axis()
+        .scale(xScale)
+        .ticks(5);
+
+    window.addEventListener("wheel", update, { passive: true });
 
     draw();
 
@@ -75,35 +81,14 @@ function goalChart(config) {
 
     function draw() {
         let g = svg.append('g')
-            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+            .attr("class", "axis")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+            .call(xAxis)
 
-        let defs = g.append("defs")
-        defs.append("clipPath")
-            .attr("id", "clipTick")
-            .append("rect")
-            .attr("width", chart_Width)
-            .attr("height", chart_Height + tick_Height + header_Gap)
-
-        defs.append("clipPath")
-            .attr("id", "clipChart")
-            .append("rect")
-            .attr("y", tick_Height + header_Gap)
-            .attr("width", chart_Width)
-            .attr("height", chart_Height);
-
-        g.append('g')
-            .append("rect")
+        g.append("rect")
             .attr("width", chart_Width)
             .attr("height", chart_Height + tick_Height + header_Gap)
             .attr('class', "chart-Block")
-
-        g.append("g")
-            .attr("class", "tick")
-            .attr("clip-path", "url(#clipTick)");
-
-        g.append("g")
-            .attr("class", "chart")
-            .attr("clip-path", "url(#clipChart)");
 
         g.append("rect")
             .attr("class", "zoom box")
@@ -111,25 +96,49 @@ function goalChart(config) {
             .attr("height", chart_Height + tick_Height + header_Gap)
             .style("visibility", "hidden")
             .attr("pointer-events", "all")
+            .call(zoom)
+
+        let defs = g.append("defs");
+        // defs.append("clipPath")
+        //     .attr("id", "clipTick")
+        //     .append("rect")
+        //     .attr("width", chart_Width)
+        //     .attr("height", chart_Height + tick_Height + header_Gap)
+
+        // g.append("g")
+        //     .attr("class", "tick")
+        //     .attr("clip-path", "url(#clipTick)");
+
+        defs.append("clipPath")
+            .attr("id", "clipChart")
+            .append("rect")
+            .attr("y", tick_Height + header_Gap)
+            .attr("width", chart_Width)
+            .attr("height", chart_Height - header_Gap);
+
+        g.append("g")
+            .attr("class", "chart")
+            .attr("clip-path", "url(#clipChart)");
 
         svg.on("click", function() {
             preOffsetX = 0;
             preOffsetY = offsetY;
-
-            // let coords = d3.mouse(this);
-            // let left = moment(date_boundary[0]);
-            // let right = moment(date_boundary[1]);
-            // var duration = moment.duration(right.diff(left));
-            // x = moment(left.add(Math.round((coords[0] - margin.left) / chart_Width * duration.asDays()), 'days'))
         });
+
 
         update();
     }
 
     function update() {
+        yScale.domain(treeData.map(function(d, i) {
+                return i + 1;
+            }))
+            .rangeRoundBands([offsetY, offsetY + treeHeight], 0.1);
+
+
         if (zoom_update()) {
-            setScale();
-            drawHeader();
+            // setScale();
+            // drawHeader();
             drawTree();
         }
 
@@ -144,9 +153,9 @@ function goalChart(config) {
         function getWidth(node) {
             let nodeWidth = 0;
             if (endsAfter(node)) {
-                nodeWidth = Math.abs(xaxis(new Date(date_boundary[1])) - xaxis(new Date(node.startAt)));
+                nodeWidth = Math.abs(xScale(new Date(date_boundary[1])) - xScale(new Date(node.startAt)));
             } else if (startsBefore(node)) {
-                nodeWidth = Math.abs(xaxis(new Date(date_boundary[0])) - xaxis(new Date(node.endAt)));
+                nodeWidth = Math.abs(xScale(new Date(date_boundary[0])) - xScale(new Date(node.endAt)));
             } else {
                 nodeWidth = getActualWidth(node);
             }
@@ -154,17 +163,10 @@ function goalChart(config) {
         }
 
         function getActualWidth(node) {
-            return Math.abs(xaxis(new Date(node.endAt)) - xaxis(new Date(node.startAt)));
+            return Math.abs(xScale(new Date(node.endAt)) - xScale(new Date(node.startAt)));
         }
 
         function setScale() {
-            xaxis.domain(date_boundary)
-                .range([0, chart_Width])
-
-            yaxis.domain(treeData.map(function(d, i) {
-                    return i + 1;
-                }))
-                .rangeRoundBands([offsetY, offsetY + treeHeight], 0.1);
 
             let left = moment(date_boundary[0]);
             let right = moment(date_boundary[1]);
@@ -338,7 +340,7 @@ function goalChart(config) {
                 .enter()
                 .append('g')
                 .attr("transform", function(d) {
-                    return "translate(" + (xaxis(new Date(d.startAt))) + ", 0)";
+                    return "translate(" + (xScale(new Date(d.startAt))) + ", 0)";
                 })
                 .call(appendTick)
                 .call(appendLabel)
@@ -388,7 +390,7 @@ function goalChart(config) {
                 .attr('class', 'Single--Block')
                 .attr("transform", function(d, i) {
                     // return "translate(" + (margin.left) + ", " + (margin.top + tick_Height + header_Gap) + ")";
-                    return "translate(" + xaxis(new Date(d.startAt)) + margin.left + "," + (margin.top + tick_Height + header_Gap) + ")";
+                    return "translate(" + xScale(new Date(d.startAt)) + margin.left + "," + (margin.top + tick_Height + header_Gap) + ")";
                 })
                 .call(appendBar)
                 .call(appendConnector)
@@ -397,7 +399,7 @@ function goalChart(config) {
                 .append('g')
                 .attr('transform', function(d) {
                     if (startsBefore(d) && isVisible(d)) {
-                        var position = Math.abs(xaxis(new Date(d.startAt)));
+                        var position = Math.abs(xScale(new Date(d.startAt)));
                         return "translate(" + position + ", 0)";
                     } else {
                         return "translate(0, 0)";
@@ -420,7 +422,7 @@ function goalChart(config) {
                     .attr('ry', 5)
                     .attr("x", 0)
                     .attr("y", function(d, i) {
-                        return yaxis(i + 1);
+                        return yScale(i + 1);
                     })
                     .attr("width", function(d) {
                         return (getActualWidth(d) + 10);
@@ -433,7 +435,7 @@ function goalChart(config) {
                     .attr('class', 'node-Title')
                     .attr("x", config.box_padding)
                     .attr("y", function(d, i) {
-                        return (yaxis(i + 1) + 20)
+                        return (yScale(i + 1) + 20)
                     })
                     .text(function(d) {
                         return d.title
@@ -447,7 +449,7 @@ function goalChart(config) {
                         if (position < 10) {
                             position = 0;
                         }
-                        return "translate(" + position + ", " + (yaxis(i + 1) + 45) + ")";
+                        return "translate(" + position + ", " + (yScale(i + 1) + 45) + ")";
                     })
                     .call(renderDuration)
                     .call(appendProgressBar)
@@ -460,7 +462,7 @@ function goalChart(config) {
                         if (position < 10) {
                             position = 0;
                         }
-                        return "translate(" + position + ", " + (yaxis(i + 1) + 80) + ")";
+                        return "translate(" + position + ", " + (yScale(i + 1) + 80) + ")";
                     })
                     .call(renderPro)
             }
@@ -541,15 +543,15 @@ function goalChart(config) {
                         if (p == null) { return { x: -1000, y: -1000 }; }
                         return {
                             x: 0,
-                            y: yaxis(getPos_Y(d)) + 43
+                            y: yScale(getPos_Y(d)) + 43
                         };
                     })
                     .target(function(d) {
                         p = getParent(d);
                         if (p == null) { return { x: -1000, y: -1000 }; }
                         return {
-                            x: getActualWidth(p) + (xaxis(new Date(p.startAt)) - xaxis(new Date(d.startAt))) + 10,
-                            y: yaxis(getPos_Y(p)) + 43
+                            x: getActualWidth(p) + (xScale(new Date(p.startAt)) - xScale(new Date(d.startAt))) + 10,
+                            y: yScale(getPos_Y(p)) + 43
                         };
                     })
                     .projection(function(d, i) {
@@ -591,50 +593,46 @@ function goalChart(config) {
 
         function zoom_update() {
             let e = d3.event;
+            // console.log(e)
             if (e != null) {
-                let left = moment(date_boundary[0]);
-                let right = moment(date_boundary[1]);
-                let region = moment.duration(right.diff(left - 1)).asDays();
+                //     let left = moment(date_boundary[0]);
+                //     let right = moment(date_boundary[1]);
+                //     let region = moment.duration(right.diff(left - 1)).asDays();
 
-                if (e.scale == 1) {
-                    // scale x-axis
-                    let offset = e.translate[0] - preOffsetX;
-                    preOffsetX = e.translate[0];
+                //     if (e.scale == 1) {
+                //         // scale x-axis
+                //         let offset = e.translate[0] - preOffsetX;
+                //         preOffsetX = e.translate[0];
 
-                    // console.log(e.translate[0], ",", offset);
+                //         // console.log(e.translate[0], ",", offset);
 
-                    date_boundary[0] = moment(left.subtract(offset * region / chart_Width, 'days'));
-                    date_boundary[1] = moment(left.add(region, 'days'));
+                //         date_boundary[0] = moment(left.subtract(offset * region / chart_Width, 'days'));
+                //         date_boundary[1] = moment(left.add(region, 'days'));
 
-                    // scale y-axia
-                    offsetY = e.translate[1] + preOffsetY;
-                    if (offsetY > 0) offsetY = 0;
-                    if (offsetY < chart_Height - treeHeight) offsetY = chart_Height - treeHeight;
-                } else {
-                    right = moment(left.add(region / e.scale, 'days'));
-                    region = moment.duration(right.diff(moment(date_boundary[0]) - 1)).asDays();
+                // scale y-axia
+                // offsetY = e.translate[1] + preOffsetY;
+                // if (offsetY > 0) offsetY = 0;
+                // if (offsetY < chart_Height - treeHeight) offsetY = chart_Height - treeHeight;
+            } else {
+                //         right = moment(left.add(region / e.scale, 'days'));
+                //         region = moment.duration(right.diff(moment(date_boundary[0]) - 1)).asDays();
 
-                    let tickWidth = chart_Width / region;
+                //         let tickWidth = chart_Width / region;
+                //         scalable = true;
+                // if (e.scale > 1 && tickWidth > maxTickWidth) scalable = false;
+                // if (e.scale < 1 && tickWidth * 365 < minTickWidth) scalable = false;
 
-                    scalable = true;
-                    if (e.scale > 1 && tickWidth > maxTickWidth) scalable = false;
-                    if (e.scale < 1 && tickWidth * 365 < minTickWidth) scalable = false;
+                //         if (scalable == true) {
+                //             date_boundary[0] = moment(date_boundary[0]);
+                //             date_boundary[1] = moment(right);
+                //         } else {
+                //             return false;
+                //         }
 
-                    if (scalable == true) {
-                        date_boundary[0] = moment(date_boundary[0]);
-                        date_boundary[1] = moment(right);
-                    } else {
-                        return false;
-                    }
-
-                }
+                //     }
             }
 
-            var zoom = d3.behavior.zoom()
-                .x(xscale)
-                .on("zoom", update);
-
-            svg.select('rect.zoom.box').call(zoom);
+            // svg.select('rect.zoom.box').call(zoom);
             return true;
         }
     }
