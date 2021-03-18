@@ -110,6 +110,14 @@ function goalChart(config) {
             .attr("height", h)
             .attr('class', "chart-Block")
 
+        g.append("rect")
+            .attr("class", "zoom box")
+            .attr("width", chart_Width)
+            .attr("height", h)
+            .style("visibility", "hidden")
+            .attr("pointer-events", "all")
+            .call(zoom)
+
         g.append("g")
             .attr("id", "clipTick")
             .append("rect")
@@ -134,14 +142,6 @@ function goalChart(config) {
         g.append("g")
             .attr("class", "chart")
             .attr("clip-path", "url(#clipChart)");
-
-        g.append("rect")
-            .attr("class", "zoom box")
-            .attr("width", chart_Width)
-            .attr("height", h)
-            .style("visibility", "hidden")
-            .attr("pointer-events", "all")
-            .call(zoom)
 
         update();
     }
@@ -398,11 +398,18 @@ function goalChart(config) {
 
                     zoom.translate(e.translate);
                     yScale.range([e.translate[1], e.translate[1] / e.scale + treeHeight]);
+                    // svg.select("g.chart")
+                    //     .transition()
+                    //     .duration(500)
+                    //     .ease('quad-out')
+                    //     .attr('transform', 'translate(' + e.translate + ')');
                 }
             }
 
             svg.select("g.axis").call(xAxis);
             return true;
         }
+
     }
+
 }
