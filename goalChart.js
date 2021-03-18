@@ -31,6 +31,28 @@ function goalChart(config) {
     date_boundary[0] = moment(region[0]).startOf('month').toDate();
     date_boundary[1] = moment(region[1]).endOf('month').toDate();
 
+    var formatDay = d3.time.format("%a %d"),
+        formatWeek = d3.time.format("%b %d"),
+        formatMonth = function(d) {
+            var milli = (d.getTime() - 10000);
+            var vanilli = new Date(milli);
+            var mon = vanilli.getMonth();
+            var yr = vanilli.getFullYear();
+
+            // return appropriate quarter for that month
+            if ((mon + 1) % 3 == 0) {
+                return yr + " Q" + parseInt(mon / 3 + 1);
+            } else {
+                return d3.time.format("%Y %b")(d);
+            }
+        },
+        formatYear = d3.time.format("%Y");
+
+    function multiFormat(date) {
+        return (d3.time.month(date) < date ? (d3.time.week(date) < date ? formatDay : formatWeek) :
+            d3.time.year(date) < date ? formatMonth : formatYear)(date);
+    }
+
     var svg = ELEMENT
         .append('div')
         .append("svg")
@@ -45,13 +67,14 @@ function goalChart(config) {
 
     var zoom = d3.behavior.zoom()
         .on("zoom", update)
-        .scaleExtent([0.1, 10])
+        .scaleExtent([0.1, 40])
         .x(xScale);
     // .y(yScale)
 
     var xAxis = d3.svg.axis()
         .scale(xScale)
-        .ticks(5);
+        .ticks(5)
+        .tickFormat(multiFormat);
 
     window.addEventListener("wheel", update, { passive: true });
 
@@ -81,9 +104,7 @@ function goalChart(config) {
 
     function draw() {
         let g = svg.append('g')
-            .attr("class", "axis")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
-            .call(xAxis)
 
         g.append("rect")
             .attr("width", chart_Width)
@@ -98,18 +119,21 @@ function goalChart(config) {
             .attr("pointer-events", "all")
             .call(zoom)
 
-        let defs = g.append("defs");
-        // defs.append("clipPath")
-        //     .attr("id", "clipTick")
-        //     .append("rect")
-        //     .attr("width", chart_Width)
-        //     .attr("height", chart_Height + tick_Height + header_Gap)
+        g.append("g")
+            .attr("class", "axis")
+            .call(xAxis)
+            // .call(zoom)
+            // defs.append("clipPath")
+            //     .attr("id", "clipTick")
+            //     .append("rect")
+            //     .attr("width", chart_Width)
+            //     .attr("height", chart_Height + tick_Height + header_Gap)
 
         // g.append("g")
         //     .attr("class", "tick")
         //     .attr("clip-path", "url(#clipTick)");
 
-        defs.append("clipPath")
+        g.append("clipPath")
             .attr("id", "clipChart")
             .append("rect")
             .attr("y", tick_Height + header_Gap)
@@ -428,6 +452,7 @@ function goalChart(config) {
                         return (getActualWidth(d) + 10);
                     })
                     .attr("height", 87)
+                    .style("cursor", "move")
             }
 
             function appendTitle(d, i) {
@@ -633,6 +658,7 @@ function goalChart(config) {
             }
 
             // svg.select('rect.zoom.box').call(zoom);
+            svg.select("g.axis").call(xAxis);
             return true;
         }
     }
