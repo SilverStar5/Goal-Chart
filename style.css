@@ -10,16 +10,9 @@ body {
     cursor: pointer;
 }
 
-.axis line,
-.axis path {
-    fill: none;
-    stroke: rgb(155, 155, 155);
-    /* shape-rendering: crispEdges; */
-}
-
 .node-Block {
     fill: #2ad8b2;
-    stroke: #ccc;
+    stroke: #22af91;
     stroke-width: 1;
     border-radius: 2px;
 }
@@ -85,6 +78,19 @@ body {
     z-index: -100;
 }
 
+.axis line,
+.axis path {
+    fill: none;
+    stroke: rgb(155, 155, 155);
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    text-anchor: start;
+    stroke: rgb(0, 0, 0);
+    shape-rendering: crispEdges;
+}
+
 .tick-Title {
     font-size: 13px;
 }
@@ -102,7 +108,7 @@ body {
 
 .chart-Block {
     overflow: auto;
-    fill: rgb(214, 214, 214);
+    fill: rgb(226, 226, 226);
     stroke: rgb(0, 0, 0);
     stroke-width: 1px;
 }
