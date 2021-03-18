@@ -73,7 +73,9 @@ function goalChart(config) {
 
     var xAxis = d3.svg.axis()
         .scale(xScale)
+        .orient("top")
         .ticks(5)
+        .tickSize(chart_Height)
         .tickFormat(multiFormat);
 
     window.addEventListener("wheel", update, { passive: true });
@@ -120,14 +122,16 @@ function goalChart(config) {
             .call(zoom)
 
         g.append("g")
+            .attr("transform", "translate(0," + chart_Height + ")")
             .attr("class", "axis")
             .call(xAxis)
             // .call(zoom)
-            // defs.append("clipPath")
-            //     .attr("id", "clipTick")
-            //     .append("rect")
-            //     .attr("width", chart_Width)
-            //     .attr("height", chart_Height + tick_Height + header_Gap)
+
+        // defs.append("clipPath")
+        //     .attr("id", "clipTick")
+        //     .append("rect")
+        //     .attr("width", chart_Width)
+        //     .attr("height", chart_Height + tick_Height + header_Gap)
 
         // g.append("g")
         //     .attr("class", "tick")
@@ -162,7 +166,6 @@ function goalChart(config) {
 
         if (zoom_update()) {
             // setScale();
-            // drawHeader();
             drawTree();
         }
 
@@ -351,55 +354,6 @@ function goalChart(config) {
                     ranges.push(node);
                 }
                 return ranges;
-            }
-        }
-
-        function drawHeader() {
-            var tick = svg.select("g.tick");
-            tick.html("");
-
-            tick.append('g')
-                .selectAll(".tick")
-                .data(time_scales)
-                .enter()
-                .append('g')
-                .attr("transform", function(d) {
-                    return "translate(" + (xScale(new Date(d.startAt))) + ", 0)";
-                })
-                .call(appendTick)
-                .call(appendLabel)
-                .call(appendLine)
-
-            function appendTick() {
-                this.append("rect")
-                    .attr("x", 0)
-                    .attr("width", function(d) {
-                        return getWidth(d);
-                    })
-                    .attr("height", tick_Height)
-                    .attr('class', "tick-Block")
-            }
-
-            function appendLabel() {
-                this.append("text")
-                    .attr("x", 25)
-                    .attr('y', 35)
-                    .attr("width", function(d) {
-                        return getWidth(d);
-                    })
-                    .text(function(d) {
-                        return d.name;
-                    })
-                    .attr('class', "tick-Title");
-            }
-
-            function appendLine(d, i) {
-                this.append("line")
-                    .attr('class', 'tick-Line')
-                    .attr("x1", 0)
-                    .attr("y1", tick_Height)
-                    .attr("x2", 0)
-                    .attr("y2", tick_Height + chart_Height + header_Gap)
             }
         }
 

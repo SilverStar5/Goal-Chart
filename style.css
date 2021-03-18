@@ -10,6 +10,13 @@ body {
     cursor: pointer;
 }
 
+.axis line,
+.axis path {
+    fill: none;
+    stroke: rgb(155, 155, 155);
+    /* shape-rendering: crispEdges; */
+}
+
 .node-Block {
     fill: #2ad8b2;
     stroke: #ccc;
@@ -95,7 +102,7 @@ body {
 
 .chart-Block {
     overflow: auto;
-    fill: white;
+    fill: rgb(214, 214, 214);
     stroke: rgb(0, 0, 0);
-    stroke-width: 2px;
+    stroke-width: 1px;
 }
