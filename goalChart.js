@@ -25,6 +25,9 @@ function goalChart(config) {
     var chart_Width = d3.max([total_Width, 400]) - margin.left - margin.right;
     var total_Height = ELEMENT[0][0].offsetHeight - 10;
     var chart_Height = d3.max([total_Height, 400]) - margin.top - tick_Height - margin.bottom;
+    var wheelFlag = false,
+        offsetY = 0,
+        diff = 0; // diff between wheel and mousemove
 
     var svg = ELEMENT
         .append('div')
@@ -32,19 +35,22 @@ function goalChart(config) {
         .attr("width", total_Width)
         .attr("height", total_Height)
 
+    svg.on("click", function() {
+        diff = 0;
+    })
+
     var xScale = d3.time.scale()
         .domain(date_boundary)
         .range([0, chart_Width])
 
     var yScale = d3.scale.linear()
-        .domain([1, treeData.length])
+        .domain([1, treeData.length + 1])
         .range([0, treeHeight]);
 
     var zoom = d3.behavior.zoom()
         .on("zoom", update)
         .scaleExtent([0.1, 40])
         .x(xScale)
-        // .y(yScale)
 
     var xAxis = d3.svg.axis()
         .scale(xScale)
@@ -110,6 +116,13 @@ function goalChart(config) {
             .attr("height", h)
             .attr('class', "chart-Block")
 
+        g.append("g")
+            .attr("id", "clipTick")
+            .append("rect")
+            .attr("width", chart_Width)
+            .attr("height", tick_Height + header_Gap)
+            .attr('class', "tick-Block")
+
         g.append("rect")
             .attr("class", "zoom box")
             .attr("width", chart_Width)
@@ -117,13 +130,6 @@ function goalChart(config) {
             .style("visibility", "hidden")
             .attr("pointer-events", "all")
             .call(zoom)
-
-        g.append("g")
-            .attr("id", "clipTick")
-            .append("rect")
-            .attr("width", chart_Width)
-            .attr("height", tick_Height + header_Gap)
-            .attr('class', "tick-Block")
 
         g.append("g")
             .attr("transform", "translate(0," + h + ")")
@@ -388,21 +394,33 @@ function goalChart(config) {
             }
         }
 
+
         function zoom_update() {
             let e = d3.event;
             if (e != null) {
                 // panning y-axia
                 if (e.sourceEvent.type === "mousemove") {
-                    if (e.translate[1] > 0) e.translate[1] = 0;
-                    if (e.translate[1] < chart_Height - treeHeight) e.translate[1] = chart_Height - treeHeight;
+                    if (wheelFlag) {
+                        diff = offsetY - e.translate[1];
+                    } else {
+                        offsetY = e.translate[1] + diff;
+                    }
+                    wheelFlag = false;
 
-                    zoom.translate(e.translate);
-                    yScale.range([e.translate[1], e.translate[1] / e.scale + treeHeight]);
+                    if (offsetY > 0) offsetY = 0;
+                    if (offsetY < chart_Height - treeHeight) offsetY = chart_Height - treeHeight;
+
+                    zoom.translate([e.translate[0], offsetY]);
+                    yScale.range([offsetY, (offsetY + treeHeight)]);
+
                     // svg.select("g.chart")
                     //     .transition()
                     //     .duration(500)
                     //     .ease('quad-out')
                     //     .attr('transform', 'translate(' + e.translate + ')');
+                }
+                if (e.sourceEvent.type === "wheel") {
+                    wheelFlag = true;
                 }
             }
 
