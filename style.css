@@ -10,11 +10,15 @@ body {
     cursor: pointer;
 }
 
-.node-Block {
+.node {
     fill: #2ad8b2;
     stroke: #22af91;
     stroke-width: 1;
-    border-radius: 2px;
+}
+
+.left-Handle,
+.right-Handle {
+    fill: #22af91;
 }
 
 .node-Title {
@@ -72,7 +76,7 @@ body {
 
 .Connector {
     /* Connector */
-    stroke: #625d5d25;
+    stroke: #0a0a0a25;
     stroke-width: 2px;
     fill: none;
     z-index: -100;

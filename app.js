@@ -2414,14 +2414,19 @@ var data = [{
     }]
 }]
 
+var callback = function(node) {
+    document.getElementById("callback_label").innerHTML =
+        "startAt : " + node.startAt +
+        ", endtAt : " + node.endAt +
+        ", left : " + node.left +
+        ", right : " + node.right +
+        ", parent : " + node.parentId;
+}
+
 var config = {
     data: data, // Your actuall data
+    callback: callback, // callback function
     element: "#Chart", // The element for rendering the chart
-    box_padding: 10, // Padding for the blocks
-    // metrics: { type: "yearly", years: [2021] },
-    metrics: { type: "overall", years: [2020, 2021] },
-    //metrics: { type: "quarterly", months: ['March 2020', 'April 2020', 'May 2020', 'June 2020', 'July 2020', 'August 2020', 'Septempber 2020', 'October 2020', 'November 2020', 'December 2020', 'January 2021', 'February 2021', 'March 2021', 'April 2021'] }, // For quarterly or half yearly data
-
 }
 
 goalChart(config);

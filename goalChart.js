@@ -2,12 +2,14 @@ function goalChart(config) {
 
     var data = config.data;
 
-    var treeData;
-    data.forEach(element => {
-        if (element.parentId == null) {
-            treeData = new Array();
-            makeTree(treeData, element.id)
-        }
+    var treeData = new Array();
+    var subTreeData = new Array();
+
+    makeTree();
+    updateDepths();
+
+    treeData.forEach((e, i) => {
+        console.log(e.parentIdx, e.depths, e.childrens, e.rootIdx)
     });
 
     var region = getDataBoundary(treeData);
@@ -20,6 +22,7 @@ function goalChart(config) {
 
     var tick_Height = 40;
     var header_Gap = 10; // gap between header and chart
+    var node_padding = 10;
     var margin = { top: 20, right: 50, bottom: 20, left: 50 };
     var total_Width = ELEMENT[0][0].offsetWidth;
     var chart_Width = d3.max([total_Width, 400]) - margin.left - margin.right;
@@ -28,6 +31,7 @@ function goalChart(config) {
     var wheelFlag = false,
         offsetY = 0,
         diff = 0; // diff between wheel and mousemove
+    var draggingObject = "";
 
     var svg = ELEMENT
         .append('div')
@@ -48,9 +52,22 @@ function goalChart(config) {
         .range([0, treeHeight]);
 
     var zoom = d3.behavior.zoom()
-        .on("zoom", update)
+        .on("zoom", function(node) {
+            update(node)
+        })
         .scaleExtent([0.1, 40])
         .x(xScale)
+
+    var drag = d3.behavior.drag()
+        .on('dragstart', function(d) {
+            draggingObject = d3.event.sourceEvent.target.className.baseVal;
+        })
+        .on('drag', function(node) {
+            update(node)
+        })
+        .on('dragend', function(d) {
+            draggingObject = "";
+        })
 
     var xAxis = d3.svg.axis()
         .scale(xScale)
@@ -59,15 +76,40 @@ function goalChart(config) {
         .tickSize(chart_Height + header_Gap)
         .tickFormat(formatXaxis)
 
-    window.addEventListener("wheel", update, { passive: true });
+    document.addEventListener("wheel", null, { passive: true });
 
     draw();
 
-    function makeTree(parent, parentId = null) {
-        data.forEach(element => {
-            if (element.parentId == parentId) {
-                parent.push(element)
-                makeTree(parent, element.id)
+    function makeTree(parentId = null, parentIdx = -1) {
+        data.forEach((e, i) => {
+            if (e.parentId == parentId) {
+                let treeItem = {
+                    parentIdx: parentIdx,
+                    dataIdx: i,
+                    idx: treeData.length,
+                    childrens: 0,
+                    rootIdx: (parentIdx == -1) ? treeData.length : treeData[parentIdx].rootIdx,
+                    id: e.id,
+                    parentId: e.parentId,
+                    startAt: e.startAt,
+                    endAt: (e.endAt >= e.startAt) ? e.endAt : e.startAt,
+                    title: e.title,
+                    progress: e.progress,
+                    left: e.startAt,
+                    right: e.endAt,
+                    depths: 0,
+                };
+
+                treeData.push(treeItem);
+                if (parentIdx == -1) {
+                    subTreeData.push(treeData.length - 1);
+                } else {
+                    if (e.startAt < treeData[parentIdx].left) treeData[parentIdx].left = e.startAt;
+                    if (e.endAt > treeData[parentIdx].right) treeData[parentIdx].right = e.endAt;
+                    treeData[parentIdx].childrens++;
+                }
+
+                makeTree(e.id, treeData.length - 1)
             }
         });
     }
@@ -124,7 +166,7 @@ function goalChart(config) {
             .attr('class', "tick-Block")
 
         g.append("rect")
-            .attr("class", "zoom box")
+            .attr("class", "zoom-Block")
             .attr("width", chart_Width)
             .attr("height", h)
             .style("visibility", "hidden")
@@ -152,10 +194,12 @@ function goalChart(config) {
         update();
     }
 
-    function update() {
-        if (zoom_update()) {
-            drawTree();
-        }
+    function update(node) {
+        _update(node)
+        drawTree();
+
+        svg.selectAll(".chart .node-Block")
+            .call(drag)
 
         function drawTree() {
             var chart = svg.select("g.chart");
@@ -164,136 +208,165 @@ function goalChart(config) {
             var Blocks = chart.selectAll(".chart")
                 .data(treeData)
                 .enter()
+
+            Blocks
                 .append("g")
-                .attr('class', 'Single--Block')
+                .attr('class', 'node-Block')
                 .attr("transform", function(d, i) {
-                    // return "translate(" + (margin.left) + ", " + (margin.top + tick_Height + header_Gap) + ")";
-                    return "translate(" + xScale(new Date(d.startAt)) + margin.left + "," + (margin.top + tick_Height + header_Gap) + ")";
+                    return "translate(" + xScale(new Date(d.startAt)) + margin.left + "," +
+                        (margin.top + tick_Height + header_Gap + yScale(d.depths)) + ")";
                 })
-                .call(appendBar)
+                .call(appendNode)
+                .each(function(d, i) {
+                    trimTitle(getWidth(d), this, node_padding * 2)
+                })
+
+            Blocks
+                .append("g")
+                .attr('class', 'Connector')
+                .attr("transform", function(d, i) {
+                    return "translate(0," + (margin.top + tick_Height + header_Gap) + ")";
+                })
                 .call(appendConnector)
 
-            Blocks
-                .append('g')
-                .attr('transform', function(d) {
-                    if (startsBefore(d) && isVisible(d)) {
-                        var position = Math.abs(xScale(new Date(d.startAt)));
-                        return "translate(" + position + ", 0)";
-                    } else {
-                        return "translate(0, 0)";
-                    }
-                })
-                .call(appendTitle)
-                .call(appendBody)
-                .call(appendFooter)
-
-            Blocks
-                .each(function(d, i) {
-                    trimTitle(getWidth(d), this, config.box_padding * 2)
-                })
-
-            function appendBar(d, i) {
+            function appendNode(d, i) {
                 this.append('rect')
-                    .attr('class', 'node-Block')
+                    .attr('class', 'node')
                     .attr('fill', 'auto')
                     .attr('rx', 5)
                     .attr('ry', 5)
                     .attr("x", 0)
-                    .attr("y", function(d, i) {
-                        return yScale(i + 1);
-                    })
+                    .attr("y", 0)
                     .attr("width", function(d) {
                         return (getActualWidth(d) + 10);
                     })
                     .attr("height", 87)
                     .style("cursor", "move")
-            }
 
-            function appendTitle(d, i) {
-                this.append('text')
-                    .attr('class', 'node-Title')
-                    .attr("x", config.box_padding)
-                    .attr("y", function(d, i) {
-                        return (yScale(i + 1) + 20)
-                    })
-                    .text(function(d) {
-                        return d.title
-                    })
-            }
+                this.call(appendResizeHandle)
 
-            function appendBody(d, i) {
                 this.append('g')
-                    .attr("transform", function(d, i) {
-                        var position = config.box_padding;
-                        if (position < 10) {
-                            position = 0;
-                        }
-                        return "translate(" + position + ", " + (yScale(i + 1) + 45) + ")";
+                    .attr("transform", function(d) {
+                        return "translate(" + node_padding + ", 0)";
                     })
-                    .call(renderDuration)
-                    .call(appendProgressBar)
+                    .call(appendTitle)
+                    .call(appendDuration)
+                    .call(appendProgress)
+
+                function appendTitle(d, i) {
+                    this.append('text')
+                        .attr('class', 'node-Title')
+                        .attr("y", 20)
+                        .text(function(d) {
+                            return d.title
+                        })
+                }
+
+                function appendDuration(d, i) {
+                    this.append('text')
+                        .attr('class', 'node-Duration')
+                        .attr('y', 40)
+                        .text(function(d) {
+                            return "Due" + " " + moment(d.endAt).format("MMM DD,YYYY");
+                        })
+                        .attr('opacity', function(d) {
+                            return Number(getWidth(d) > 200)
+                        })
+                }
+
+                function appendProgress(d, i) {
+                    this.append('rect')
+                        .attr('class', 'ProgressBar')
+                        .attr('fill', '#ddd')
+                        .attr('width', function(d) {
+                            return Math.max(0, getActualWidth(d) - 20);
+                        })
+
+                    this.append('rect')
+                        .attr('class', 'ProgressBar')
+                        .attr('fill', '#4975D4')
+                        .attr('width', function(d) {
+                            return (d.progress * (Math.max(0, getActualWidth(d) - 20))) / 100;
+                        })
+
+                    this.selectAll('.ProgressBar')
+                        .attr('y', 50)
+                        .attr('height', 7)
+                        .attr('rx', 5)
+                        .attr('ry', 5)
+                        .attr('opacity', function(d) {
+                            return getActualWidth(d);
+                        })
+
+                    this.append('text')
+                        .attr('class', 'node-ProNum')
+                        .attr('x', 10)
+                        .attr('y', 80)
+                        .text(function(d) {
+                            var proText = d.progress + "%"
+                            return proText
+                        })
+                        .attr('opacity', function(d) {
+                            return Number(getWidth(d) > 80)
+                        })
+                }
             }
 
-            function appendFooter(d, i) {
-                this.append('g')
-                    .attr("transform", function(d, i) {
-                        var position = config.box_padding;
-                        if (position < 10) {
-                            position = 0;
-                        }
-                        return "translate(" + position + ", " + (yScale(i + 1) + 80) + ")";
-                    })
-                    .call(renderPro)
-            }
-
-            function appendProgressBar(d, i) {
+            function appendResizeHandle(d, i) {
                 this.append('rect')
-                    .attr('class', 'ProgressBar')
-                    .attr('fill', '#ddd')
-                    .attr('width', function(d) {
-                        return getActualWidth(d) - 20;
-                    })
-
-                this.append('rect')
-                    .attr('class', 'ProgressBar')
-                    .attr('fill', '#4975D4')
-                    .attr('width', function(d) {
-                        return (d.progress * (getActualWidth(d) - 20)) / 100;
-                    })
-
-                this.selectAll('.ProgressBar')
+                    .attr('class', 'left-Handle')
+                    .attr('fill', 'auto')
+                    .attr("x", -3)
+                    .attr('y', 5)
                     .attr('rx', 5)
                     .attr('ry', 5)
-                    .attr('y', 10)
-                    .attr('height', 7)
-                    .attr('x', 10)
-                    .attr('opacity', function(d) {
-                        return getActualWidth(d);
+                    .attr("width", 3)
+                    .attr("height", 77)
+                    .style("cursor", "col-resize")
+
+                this.append('rect')
+                    .attr('class', 'right-Handle')
+                    .attr('fill', 'auto')
+                    .attr('y', 5)
+                    .attr("x", function(d) {
+                        return getActualWidth(d) + 10;
                     })
+                    .attr('rx', 5)
+                    .attr('ry', 5)
+                    .attr("width", 3)
+                    .attr("height", 77)
+                    .style("cursor", "col-resize")
             }
 
-            function renderPro(d, i) {
-                this.append('text')
-                    .attr('class', 'node-ProNum')
-                    .text(function(d) {
-                        var proText = d.progress + "%"
-                        return proText
+            function appendConnector(d) {
+                var diagonal = d3.svg.diagonal()
+                    .source(function(d, i) {
+                        p = getParent(d);
+                        if (p == null) { return { x: -1000, y: -1000 }; }
+                        return {
+                            x: xScale(new Date(d.startAt)),
+                            y: yScale(d.depths) + 43
+                        };
                     })
-                    .attr('opacity', function(d) {
-                        return Number(getWidth(d) > 80)
+                    .target(function(d, i) {
+                        p = getParent(d);
+                        if (p == null) { return { x: -1000, y: -1000 }; }
+                        return {
+                            x: getActualWidth(p) + xScale(new Date(p.startAt)) + 10,
+                            y: yScale(p.depths) + 43
+                        };
                     })
-            }
+                    .projection(function(d, i) {
+                        let x = d.x;
+                        let y = d.y;
+                        if (i == 1) { x -= 250, y -= 90; }
+                        if (i == 2) { x += 250, y += 90; }
 
-            function renderDuration(d, i) {
-                this.append('text')
-                    .attr('class', 'node-Duration')
-                    .attr('x', 10)
-                    .text(function(d) {
-                        return "Due" + " " + moment(d.endAt).format("MMM DD,YYYY");
-                    })
-                    .attr('opacity', function(d) {
-                        return Number(getWidth(d) > 200)
-                    })
+                        return [x, y];
+                    });
+
+                this.append('path')
+                    .attr('d', diagonal)
             }
 
             function trimTitle(node_width, node, padding) {
@@ -315,68 +388,6 @@ function goalChart(config) {
 
             }
 
-            function appendConnector(d) {
-                var diagonal = d3.svg.diagonal()
-                    .source(function(d) {
-                        p = getParent(d);
-                        if (p == null) { return { x: -1000, y: -1000 }; }
-                        return {
-                            x: 0,
-                            y: yScale(getPos_Y(d)) + 43
-                        };
-                    })
-                    .target(function(d) {
-                        p = getParent(d);
-                        if (p == null) { return { x: -1000, y: -1000 }; }
-                        return {
-                            x: getActualWidth(p) + (xScale(new Date(p.startAt)) - xScale(new Date(d.startAt))) + 10,
-                            y: yScale(getPos_Y(p)) + 43
-                        };
-                    })
-                    .projection(function(d, i) {
-                        let x = d.x;
-                        let y = d.y;
-                        if (i == 1) { x -= 250, y -= 90; }
-                        if (i == 2) { x += 250, y += 90; }
-
-                        return [x, y];
-                    });
-
-                this.append('path')
-                    .attr('d', diagonal)
-                    .attr('class', 'Connector')
-            }
-
-            function getParent(d) {
-                let parent = null
-                treeData.forEach((e, i) => {
-                    if (e.id == d.parentId) {
-                        parent = e;
-                    }
-                });
-
-                return parent;
-            }
-
-            function getPos_Y(d) {
-                let y = 0;
-                treeData.forEach((e, i) => {
-                    if (e.id == d.id) {
-                        y = i + 1;
-                    }
-                });
-
-                return y;
-            }
-
-            function startsBefore(node) {
-                return moment(node.startAt, "MM/DD/YYYY").isBefore(date_boundary[0])
-            }
-
-            function endsAfter(node) {
-                return moment(node.endAt, "MM/DD/YYYY").isAfter(date_boundary[1]);
-            }
-
             function getWidth(node) {
                 let nodeWidth = 0;
                 if (endsAfter(node)) {
@@ -387,19 +398,71 @@ function goalChart(config) {
                     nodeWidth = getActualWidth(node);
                 }
                 return nodeWidth;
+
+                function startsBefore(node) {
+                    return moment(node.startAt, "MM/DD/YYYY").isBefore(date_boundary[0])
+                }
+
+                function endsAfter(node) {
+                    return moment(node.endAt, "MM/DD/YYYY").isAfter(date_boundary[1]);
+                }
+
             }
 
             function getActualWidth(node) {
                 return Math.abs(xScale(new Date(node.endAt)) - xScale(new Date(node.startAt)));
             }
+
         }
 
-
-        function zoom_update() {
+        function _update(node) {
             let e = d3.event;
-            if (e != null) {
+            if (e == null) return;
+
+            if (e.type === "drag") {
+                let p = getParent(node);
+
+                let startAt = moment(xScale.invert(xScale(new Date(node.startAt)) + e.dx), "YYYY-MM-DD").format();
+                let endAt = moment(xScale.invert(xScale(new Date(node.endAt)) + e.dx), "YYYY-MM-DD").format();
+
+                if (node.childrens > 0) {
+
+                } else if (draggingObject === "left-Handle") {
+                    if (p != null) {
+                        if (startAt <= p.endAt && startAt <= node.endAt) {
+                            node.startAt = startAt;
+                        }
+                    }
+                } else if (draggingObject === "right-Handle") {
+                    if (p != null) {
+                        if (endAt <= p.endAt && endAt >= node.startAt && endAt >= p.startAt) {
+                            node.endAt = endAt;
+                        }
+                    }
+                } else {
+                    if (p != null) {
+                        if (endAt >= p.startAt && endAt <= p.endAt) {
+                            node.startAt = startAt;
+                            node.endAt = endAt;
+                        }
+                    }
+                }
+
+                data[node.dataIdx].startAt = node.startAt;
+                data[node.dataIdx].endAt = node.endAt;
+
+                // config.callback(data[node.dataIdx]);
+                config.callback(node);
+            }
+
+            if (e.type === "zoom") {
                 // panning y-axia
                 if (e.sourceEvent.type === "mousemove") {
+                    if (e.sourceEvent.target.className.baseVal != "zoom-Block") {
+                        // e.preventEvent();
+                        return;
+                    }
+
                     if (wheelFlag) {
                         diff = offsetY - e.translate[1];
                     } else {
@@ -412,12 +475,6 @@ function goalChart(config) {
 
                     zoom.translate([e.translate[0], offsetY]);
                     yScale.range([offsetY, (offsetY + treeHeight)]);
-
-                    // svg.select("g.chart")
-                    //     .transition()
-                    //     .duration(500)
-                    //     .ease('quad-out')
-                    //     .attr('transform', 'translate(' + e.translate + ')');
                 }
                 if (e.sourceEvent.type === "wheel") {
                     wheelFlag = true;
@@ -425,9 +482,52 @@ function goalChart(config) {
             }
 
             svg.select("g.axis").call(xAxis);
-            return true;
         }
 
     }
 
+    function getParent(node) {
+        if (node.parentIdx == -1) return null;
+        return treeData[node.parentIdx];
+    }
+
+    function updateDepths() {
+        var depths = 0;
+
+        for (var subTreeIdx = 0; subTreeIdx < subTreeData.length; subTreeIdx++) {
+            let subRootIdx = subTreeData[subTreeIdx];
+            for (var idx = subRootIdx; idx < treeData.length; idx++) {
+                let node = treeData[idx];
+                if (node.rootIdx != subRootIdx) break;
+
+                treeData[idx].depths = idx;
+                continue;
+
+
+                if (node.parentIdx == -1) {
+                    treeData[idx].depths = depths;
+                } else {
+                    treeData[idx].depths = treeData[treeData[idx].parentIdx].depths + 1;
+
+                    // get brothers
+                }
+
+            }
+        }
+
+        function getLastDepths(subRootIdx) {
+            if (subRootIdx == 0) return 1;
+
+            for (let i = subRootIdx; i < treeData.length; i++) {
+                let b = treeData[i];
+                if (b.parentId == node.parentId) {
+                    if (b.left <= node.left && b.right >= node.left ||
+                        b.left >= node.left && b.left <= node.right) {
+                        treeData[idx].depth = getLastDepths(b.idx) + 1;
+                    }
+                }
+            }
+            return 1;
+        }
+    }
 }
