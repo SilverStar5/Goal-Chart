@@ -6,11 +6,6 @@ function goalChart(config) {
     var subTreeData = new Array();
 
     makeTree();
-    updateDepths();
-
-    treeData.forEach((e, i) => {
-        console.log(e.parentIdx, e.depths, e.childrens, e.rootIdx)
-    });
 
     var region = getDataBoundary(treeData);
     var date_boundary = []; // x-axis boundary
@@ -83,12 +78,21 @@ function goalChart(config) {
     function makeTree(parentId = null, parentIdx = -1) {
         data.forEach((e, i) => {
             if (e.parentId == parentId) {
+                let j = 1,
+                    classId = "";
+                if (treeData.length == 0) classId = "001";
+                treeData.forEach(item => {
+                    if (item.parentIdx == parentIdx) j++;
+                    classId = j.toString().padStart(3, "0");
+                });
+
                 let treeItem = {
                     parentIdx: parentIdx,
                     dataIdx: i,
                     idx: treeData.length,
                     childrens: 0,
                     rootIdx: (parentIdx == -1) ? treeData.length : treeData[parentIdx].rootIdx,
+                    classId: (parentIdx == -1) ? classId : treeData[parentIdx].classId + classId,
                     id: e.id,
                     parentId: e.parentId,
                     startAt: e.startAt,
@@ -101,17 +105,24 @@ function goalChart(config) {
                 };
 
                 treeData.push(treeItem);
+
                 if (parentIdx == -1) {
                     subTreeData.push(treeData.length - 1);
                 } else {
-                    if (e.startAt < treeData[parentIdx].left) treeData[parentIdx].left = e.startAt;
-                    if (e.endAt > treeData[parentIdx].right) treeData[parentIdx].right = e.endAt;
                     treeData[parentIdx].childrens++;
                 }
 
                 makeTree(e.id, treeData.length - 1)
             }
         });
+
+        // update subRootTree`s region
+        subTreeData.forEach(rootIdx => {
+            resetRegion(treeData[rootIdx]);
+        });
+
+        // deployment Node
+        deploymentNode();
     }
 
     function getDataBoundary(treeData) {
@@ -238,7 +249,7 @@ function goalChart(config) {
                     .attr("x", 0)
                     .attr("y", 0)
                     .attr("width", function(d) {
-                        return (getActualWidth(d) + 10);
+                        return getActualWidth(d);
                     })
                     .attr("height", 87)
                     .style("cursor", "move")
@@ -329,7 +340,7 @@ function goalChart(config) {
                     .attr('fill', 'auto')
                     .attr('y', 5)
                     .attr("x", function(d) {
-                        return getActualWidth(d) + 10;
+                        return getActualWidth(d);
                     })
                     .attr('rx', 5)
                     .attr('ry', 5)
@@ -352,7 +363,7 @@ function goalChart(config) {
                         p = getParent(d);
                         if (p == null) { return { x: -1000, y: -1000 }; }
                         return {
-                            x: getActualWidth(p) + xScale(new Date(p.startAt)) + 10,
+                            x: getActualWidth(p) + xScale(new Date(p.startAt)),
                             y: yScale(p.depths) + 43
                         };
                     })
@@ -425,34 +436,84 @@ function goalChart(config) {
                 let startAt = moment(xScale.invert(xScale(new Date(node.startAt)) + e.dx), "YYYY-MM-DD").format();
                 let endAt = moment(xScale.invert(xScale(new Date(node.endAt)) + e.dx), "YYYY-MM-DD").format();
 
-                if (node.childrens > 0) {
+                if (node.childrens > 0) { // node is subtree
+                    // get children`s region
+                    let left = -1,
+                        right = -1;
+                    for (let idx = node.idx; idx < treeData.length; idx++) {
+                        if (treeData[idx].parentIdx == node.idx) {
+                            if (left == -1) {
+                                left = treeData[idx].right;
+                                right = treeData[idx].right;
+                            } else {
+                                if (left > treeData[idx].right) left = treeData[idx].right;
+                                if (right < treeData[idx].right) right = treeData[idx].right;
+                            }
+                        }
+                    }
 
-                } else if (draggingObject === "left-Handle") {
-                    if (p != null) {
-                        if (startAt <= p.endAt && startAt <= node.endAt) {
-                            node.startAt = startAt;
+                    // check validate
+                    if (draggingObject === "left-Handle") {
+                        if (p != null) {
+                            if (p != null && startAt <= p.endAt && startAt <= node.endAt && startAt <= left ||
+                                p == null && startAt <= left
+                            ) {
+                                node.startAt = startAt;
+                            }
                         }
-                    }
-                } else if (draggingObject === "right-Handle") {
-                    if (p != null) {
-                        if (endAt <= p.endAt && endAt >= node.startAt && endAt >= p.startAt) {
+                    } else if (draggingObject === "right-Handle") {
+                        if (p != null && endAt <= p.endAt && endAt >= node.startAt && endAt >= p.startAt && endAt >= right ||
+                            p == null && endAt >= right
+                        ) {
+                            node.endAt = endAt;
+                        }
+                    } else {
+                        if (p != null && endAt >= p.startAt && endAt <= p.endAt && startAt <= left && endAt >= right ||
+                            p == null && startAt <= left && endAt >= right) {
+                            node.startAt = startAt;
                             node.endAt = endAt;
                         }
                     }
-                } else {
-                    if (p != null) {
-                        if (endAt >= p.startAt && endAt <= p.endAt) {
-                            node.startAt = startAt;
-                            node.endAt = endAt;
+                } else { // node is alone node
+                    if (draggingObject === "left-Handle") {
+                        if (p != null) {
+                            if (startAt <= p.endAt && startAt <= node.endAt) {
+                                node.startAt = startAt;
+                            }
+                        }
+                    } else if (draggingObject === "right-Handle") {
+                        if (p != null) {
+                            if (endAt <= p.endAt && endAt >= node.startAt && endAt >= p.startAt) {
+                                node.endAt = endAt;
+                            }
+                        }
+                    } else {
+                        if (p != null) {
+                            if (endAt >= p.startAt && endAt <= p.endAt) {
+                                node.startAt = startAt;
+                                node.endAt = endAt;
+                            }
                         }
                     }
                 }
 
+                // reset parent`s regions
+                treeData.forEach(item => {
+                    if (item.rootIdx == node.rootIdx) {
+                        item.left = item.startAt;
+                        item.right = item.endAt;
+                    }
+                });
+                resetRegion(treeData[node.rootIdx]);
+
+                deploymentNode();
+
+                // set data for callabck
                 data[node.dataIdx].startAt = node.startAt;
                 data[node.dataIdx].endAt = node.endAt;
 
-                // config.callback(data[node.dataIdx]);
-                config.callback(node);
+                config.callback(data[node.dataIdx]);
+                // config.callback(node);
             }
 
             if (e.type === "zoom") {
@@ -491,43 +552,91 @@ function goalChart(config) {
         return treeData[node.parentIdx];
     }
 
-    function updateDepths() {
-        var depths = 0;
+    function deploymentNode() {
+        treeData[0].depths = 1;
+        for (var idx = 1; idx < treeData.length; idx++) {
+            let node = treeData[idx];
 
-        for (var subTreeIdx = 0; subTreeIdx < subTreeData.length; subTreeIdx++) {
-            let subRootIdx = subTreeData[subTreeIdx];
-            for (var idx = subRootIdx; idx < treeData.length; idx++) {
-                let node = treeData[idx];
-                if (node.rootIdx != subRootIdx) break;
+            let p = getParent(node);
+            let depths = (p == null) ? 1 : p.depths;
 
-                treeData[idx].depths = idx;
-                continue;
+            do {
+                depths++;
+            } while (!canDeployment(node, depths)
+                //  &&                depths < node.idx
+            );
 
-
-                if (node.parentIdx == -1) {
-                    treeData[idx].depths = depths;
-                } else {
-                    treeData[idx].depths = treeData[treeData[idx].parentIdx].depths + 1;
-
-                    // get brothers
-                }
-
-            }
+            treeData[idx].depths = depths;
         }
 
-        function getLastDepths(subRootIdx) {
-            if (subRootIdx == 0) return 1;
+        function canDeployment(node, depths) {
+            // for (let i = node.parentIdx + 1; i < node.idx; i++) {
+            //     let b = treeData[i];
+            //     if (b.parentId == node.parentId && b.id != node.id) {
+            //         if ((b.left <= node.left && b.right >= node.left ||
+            //                 b.left >= node.left && b.left <= node.right) &&
+            //             getMaxDepths(b) >= depths) {
+            //             return false;
+            //         }
+            //     }
+            // }
+            // return true;
 
-            for (let i = subRootIdx; i < treeData.length; i++) {
+            let brothers = new Array();
+            for (let i = node.parentIdx + 1; i < node.idx; i++) {
                 let b = treeData[i];
-                if (b.parentId == node.parentId) {
-                    if (b.left <= node.left && b.right >= node.left ||
-                        b.left >= node.left && b.left <= node.right) {
-                        treeData[idx].depth = getLastDepths(b.idx) + 1;
-                    }
+                if (b.parentId == node.parentId && b.id != node.id) {
+                    brothers.push(b);
                 }
             }
-            return 1;
+
+            let available = 1;
+            brothers.forEach(b => {
+                if ((b.right < node.left || node.right < b.left) && getMaxDepths(b) >= depths || getMaxDepths(b) < depths) {
+                    available *= 1;
+                } else {
+                    available *= 0;
+                }
+            });
+
+            return (available == 1);
         }
+
+    }
+
+    function getMaxDepths(root) {
+        let depths = root.depths;
+        for (let i = root.idx; i < treeData.length; i++) {
+            if (treeData[i].classId.substr(0, root.classId.length) == root.classId) {
+                if (treeData[i].depths > depths) depths = treeData[i].depths;
+            } else {
+                break;
+            }
+        }
+        return depths;
+    }
+
+    function resetRegion(root) {
+        let ret = [{
+            left: root.startAt,
+            right: root.endAt
+        }];
+
+        if (root.childrens == 0) return ret;
+
+        treeData.forEach(item => {
+            if (item.rootIdx == root.rootIdx) {
+                if (item.parentIdx == root.idx) {
+                    let region = resetRegion(item);
+                    if (ret.left > region.left) ret.left = region.left;
+                    if (ret.right < region.right) ret.right = region.right;
+                }
+            }
+        });
+
+        root.left = ret.left;
+        root.right = ret.right;
+
+        return ret;
     }
 }

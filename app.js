@@ -2417,10 +2417,11 @@ var data = [{
 var callback = function(node) {
     document.getElementById("callback_label").innerHTML =
         "startAt : " + node.startAt +
-        ", endtAt : " + node.endAt +
-        ", left : " + node.left +
-        ", right : " + node.right +
-        ", parent : " + node.parentId;
+        ", endtAt : " + node.endAt
+        //  +
+        // ", left : " + node.left +
+        // ", right : " + node.right +
+        // ", parent : " + node.parentId;
 }
 
 var config = {
