@@ -8,7 +8,7 @@ function goalChart(config) {
     // make tree for processing
     makeTree();
 
-    // // update subRootTree`s region
+    // update subRootTree`s region
     subTreeData.forEach(rootIdx => {
         resetRegion(treeData[rootIdx]);
     });
