@@ -5,7 +5,17 @@ function goalChart(config) {
     var treeData = new Array();
     var subTreeData = new Array();
 
+    // make tree for processing
     makeTree();
+
+    // // update subRootTree`s region
+    subTreeData.forEach(rootIdx => {
+        resetRegion(treeData[rootIdx]);
+    });
+
+    // deployment Node
+    deploymentNode();
+    // console.log(treeData)
 
     var region = getDataBoundary(treeData);
     var date_boundary = []; // x-axis boundary
@@ -115,14 +125,6 @@ function goalChart(config) {
                 makeTree(e.id, treeData.length - 1)
             }
         });
-
-        // update subRootTree`s region
-        subTreeData.forEach(rootIdx => {
-            resetRegion(treeData[rootIdx]);
-        });
-
-        // deployment Node
-        deploymentNode();
     }
 
     function getDataBoundary(treeData) {
@@ -454,12 +456,10 @@ function goalChart(config) {
 
                     // check validate
                     if (draggingObject === "left-Handle") {
-                        if (p != null) {
-                            if (p != null && startAt <= p.endAt && startAt <= node.endAt && startAt <= left ||
-                                p == null && startAt <= left
-                            ) {
-                                node.startAt = startAt;
-                            }
+                        if (p != null && startAt <= p.endAt && startAt <= node.endAt && startAt <= left ||
+                            p == null && startAt <= left
+                        ) {
+                            node.startAt = startAt;
                         }
                     } else if (draggingObject === "right-Handle") {
                         if (p != null && endAt <= p.endAt && endAt >= node.startAt && endAt >= p.startAt && endAt >= right ||
@@ -570,18 +570,6 @@ function goalChart(config) {
         }
 
         function canDeployment(node, depths) {
-            // for (let i = node.parentIdx + 1; i < node.idx; i++) {
-            //     let b = treeData[i];
-            //     if (b.parentId == node.parentId && b.id != node.id) {
-            //         if ((b.left <= node.left && b.right >= node.left ||
-            //                 b.left >= node.left && b.left <= node.right) &&
-            //             getMaxDepths(b) >= depths) {
-            //             return false;
-            //         }
-            //     }
-            // }
-            // return true;
-
             let brothers = new Array();
             for (let i = node.parentIdx + 1; i < node.idx; i++) {
                 let b = treeData[i];
@@ -617,12 +605,17 @@ function goalChart(config) {
     }
 
     function resetRegion(root) {
-        let ret = [{
+        let ret = {
             left: root.startAt,
             right: root.endAt
-        }];
+        };
 
-        if (root.childrens == 0) return ret;
+        if (root.childrens == 0) {
+            treeData[root.idx].left = ret.left;
+            treeData[root.idx].right = ret.right;
+
+            return ret;
+        }
 
         treeData.forEach(item => {
             if (item.rootIdx == root.rootIdx) {
@@ -634,8 +627,8 @@ function goalChart(config) {
             }
         });
 
-        root.left = ret.left;
-        root.right = ret.right;
+        treeData[root.idx].left = ret.left;
+        treeData[root.idx].right = ret.right;
 
         return ret;
     }
